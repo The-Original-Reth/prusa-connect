@@ -1,6 +1,6 @@
 <!--
-  One camera's picture: its still frame and, once a person presses play, its
-  live view over it. Play sits in the middle of the picture while the camera
+  One camera's picture: its still frame and its live view over it, which
+  starts by itself once the camera can stream. Play sits in the middle of the picture while the camera
   can stream, and stop in a corner while it does. The Cameras tab, the
   printer's Now tab, the dashboard's camera tile and the printer list's camera
   view all draw a camera this way.
@@ -90,6 +90,16 @@
     stalled = false;
     playing = !playing;
   };
+
+  // The live view starts by itself, once, as soon as the camera can stream:
+  // nobody has to press play on every page. Stop keeps it stopped here, and
+  // a view that fails is not started again until somebody presses play.
+  let autoplayed = false;
+  $effect(() => {
+    if (autoplayed || !livable || !camera.serving) return;
+    autoplayed = true;
+    if (!playing) playing = true;
+  });
 </script>
 
 <AspectRatio
