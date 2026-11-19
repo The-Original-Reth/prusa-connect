@@ -1,0 +1,14 @@
+# Runs the server on the host's own network instead of a Docker bridge.
+#
+#   docker compose -f docker-compose.local.yml -f compose.host.yml up -d --build prusa-connect
+#
+# On a bridge the server only knows its bridge address (172.18.x.x), so:
+#   - a camera's live view never starts: the WebRTC answer offers the browser that address, which no machine on the
+#     network reaches, and the log says "a camera view was answered and never dialled";
+#   - mDNS announces the bridge address, and the log warns "set network_mode: host in compose".
+# On the host's network the server offers its real address, and the API is still on port 8080.
+services:
+  prusa-connect:
+    network_mode: host
+    ports: !reset []
+    networks: !reset []
