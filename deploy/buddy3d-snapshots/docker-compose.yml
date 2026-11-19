@@ -1,0 +1,13 @@
+# Still pictures of a Prusa Buddy3D camera, for a generic camera's snapshot_url.
+#
+#   cd deploy/buddy3d-snapshots && docker compose up -d
+#
+# See README.md.
+services:
+  go2rtc:
+    image: alexxit/go2rtc:1.9.9
+    container_name: buddy3d-snapshots
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./go2rtc.yaml:/config/go2rtc.yaml:ro

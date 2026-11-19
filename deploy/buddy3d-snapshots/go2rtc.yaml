@@ -1,0 +1,13 @@
+# Only the HTTP API, and only on this machine: the server fetches
+# http://127.0.0.1:1984/api/frame.jpeg?src=buddy3d. No RTSP, WebRTC or SRTP is served to the network.
+api:
+  listen: "127.0.0.1:1984"
+rtsp:
+  listen: ""
+webrtc:
+  listen: ""
+srtp:
+  listen: ""
+streams:
+  # The camera's own RTSP stream (H.264). Change the address to your camera's.
+  buddy3d: rtsp://192.168.10.131/live
