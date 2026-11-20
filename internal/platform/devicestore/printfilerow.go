@@ -28,10 +28,14 @@ const (
 			sent = excluded.sent`
 
 	// A machine can name the file it prints in another case than the path it
-	// was sent to, so the path is compared without case.
+	// was sent to, so the path is compared without case. A CORE One names it
+	// by a short 8.3 path (/usb/MOD~1545.BGC) and shows its full name, so a
+	// row whose path ends in /<that name> matches too.
 	selectPrintFileSQL = `SELECT device_id, path, size, filament_mm, filament_g, estimated_seconds, material, sent
 		FROM print_file
-		WHERE device_id = ? AND LOWER(path) = LOWER(?)
+		WHERE device_id = ? AND (LOWER(path) = LOWER(CAST(? AS TEXT))
+			OR (CAST(? AS TEXT) <> '' AND LENGTH(path) > LENGTH(CAST(? AS TEXT))
+				AND LOWER(SUBSTR(path, LENGTH(path) - LENGTH(CAST(? AS TEXT)))) = LOWER('/' || CAST(? AS TEXT))))
 		ORDER BY sent DESC
 		LIMIT 1`
 )
@@ -73,11 +77,12 @@ func (s *Store) SavePrintFile(ctx context.Context, file PrintFile) error {
 }
 
 // PrintFileAt reads what the slicer said about the file at path on a device,
-// and reports false when this server sent nothing there.
-func (s *Store) PrintFileAt(ctx context.Context, deviceID, path string) (PrintFile, bool, error) {
+// or the file whose path ends in /name when name is not empty, and reports
+// false when this server sent nothing there.
+func (s *Store) PrintFileAt(ctx context.Context, deviceID, path, name string) (PrintFile, bool, error) {
 	var file PrintFile
 
-	err := s.db.QueryRowContext(ctx, s.q(selectPrintFileSQL), deviceID, path).Scan(
+	err := s.db.QueryRowContext(ctx, s.q(selectPrintFileSQL), deviceID, path, name, name, name, name).Scan(
 		&file.DeviceID, &file.Path, &file.Size, &file.FilamentMM, &file.FilamentG, &file.EstimatedSeconds,
 		&file.Material, &file.Sent)
 	if errors.Is(err, sql.ErrNoRows) {

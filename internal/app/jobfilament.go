@@ -95,7 +95,7 @@ func (d *devices) renderJob(ctx context.Context, job devicestore.PrinterJob) htt
 		return out
 	}
 
-	file, found, err := files.PrintFileAt(ctx, job.DeviceID, job.Path)
+	file, found, err := files.PrintFileAt(ctx, job.DeviceID, job.Path, job.DisplayName)
 	if err != nil {
 		d.log.DebugContext(ctx, "the slicer's figures for a print could not be read",
 			"device_id", job.DeviceID, "job_id", job.JobID, "error", err.Error())
@@ -122,7 +122,7 @@ func (d *devices) renderJob(ctx context.Context, job devicestore.PrinterJob) htt
 // record store without it still serves every print.
 type slicerFigures interface {
 	SavePrintFile(ctx context.Context, file devicestore.PrintFile) error
-	PrintFileAt(ctx context.Context, deviceID, path string) (devicestore.PrintFile, bool, error)
+	PrintFileAt(ctx context.Context, deviceID, path, name string) (devicestore.PrintFile, bool, error)
 }
 
 // rememberPrintFile reads the slicer's figures out of a file that has just
