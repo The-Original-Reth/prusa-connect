@@ -85,7 +85,7 @@ func TestAPrintFileKeepsTheNewestSend(t *testing.T) {
 		store := openFixture(t, e, migrated(t, e, e.OpenShared(t, 1)[0]))
 		aRegisteredDevice(t, store, "p-alpha", "Alpha")
 
-		_, held, err := store.PrintFileAt(t.Context(), "p-alpha", "/usb/frog.bgcode")
+		_, held, err := store.PrintFileAt(t.Context(), "p-alpha", "/usb/frog.bgcode", "")
 		require.NoError(t, err)
 		require.False(t, held)
 
@@ -97,11 +97,26 @@ func TestAPrintFileKeepsTheNewestSend(t *testing.T) {
 		second.FilamentMM, second.Sent = 2000, startedAt.Add(time.Hour)
 		require.NoError(t, store.SavePrintFile(t.Context(), second))
 
-		found, held, err := store.PrintFileAt(t.Context(), "p-alpha", "/USB/FROG.BGCODE")
+		found, held, err := store.PrintFileAt(t.Context(), "p-alpha", "/USB/FROG.BGCODE", "")
 		require.NoError(t, err)
 		require.True(t, held)
 		require.InDelta(t, 2000, found.FilamentMM, 0.001)
 		require.Equal(t, "PLA", found.Material)
 		require.True(t, second.Sent.Equal(found.Sent), "sent came back as %s", found.Sent)
+
+		// A CORE One prints it under a short 8.3 path and shows its full name.
+		long := PrintFile{DeviceID: "p-alpha", Path: "usb/Modern Gridfinity Case_0.4n_PETG.bgcode", FilamentMM: 48140,
+			Sent: startedAt}
+		require.NoError(t, store.SavePrintFile(t.Context(), long))
+
+		found, held, err = store.PrintFileAt(t.Context(), "p-alpha", "/usb/MOD~1545.BGC",
+			"Modern Gridfinity Case_0.4n_PETG.bgcode")
+		require.NoError(t, err)
+		require.True(t, held)
+		require.InDelta(t, 48140, found.FilamentMM, 0.001)
+
+		_, held, err = store.PrintFileAt(t.Context(), "p-alpha", "/usb/MOD~1545.BGC", "Gridfinity Case_0.4n_PETG.bgcode")
+		require.NoError(t, err)
+		require.False(t, held, "a name matched the end of a longer one")
 	})
 }

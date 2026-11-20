@@ -110,7 +110,7 @@ func (s *slicerStore) SavePrintFile(_ context.Context, file devicestore.PrintFil
 	return nil
 }
 
-func (s *slicerStore) PrintFileAt(_ context.Context, device, path string) (devicestore.PrintFile, bool, error) {
+func (s *slicerStore) PrintFileAt(_ context.Context, device, path, _ string) (devicestore.PrintFile, bool, error) {
 	file, held := s.files[device+path]
 
 	return file, held, nil
