@@ -818,6 +818,8 @@ func (d *devices) relay(
 		landed = connectorapi.File{Size: content.Size()}
 	}
 
+	d.rememberPrintFile(ctx, id, upload.Path, content)
+
 	d.fileChanged(entry, verbSend, upload.Path, &landed, nil)
 
 	return transferOf(record.snapshot()), nil

@@ -27,7 +27,8 @@ import (
 // because SQLite compiles a row-value comparison only from 3.15 and this
 // string has to render for both engines.
 const selectEndedJobsSQL = `SELECT j.printer_job_id, j.device_id, j.device_job_id, j.path, j.display_name, j.state,
-		j.progress, j.time_remaining, j.started, j.ended, j.objects, j.outcome
+		j.progress, j.time_remaining, j.started, j.ended, j.objects, j.outcome,
+		j.odometer_start, j.odometer_end, j.odometer_id
 	FROM printer_job j
 	JOIN device_access a ON a.device_id = j.device_id
 	WHERE a.subject_type = ? AND a.subject_id = ? AND (a.actions & ?) <> 0

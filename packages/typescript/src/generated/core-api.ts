@@ -4597,6 +4597,11 @@ export interface components {
              * @description When this server saw the print stop. It is absent while the print is running, which is what tells the current job from a finished one.
              */
             ended?: string;
+            /**
+             * Format: double
+             * @description The filament the print used, in millimetres, measured by the machine's extruder odometer: the reading when the print began taken off the last reading while it ran. It counts so far while the print runs. It is absent when the machine reports no odometer, for a print this server first saw after it began, and for a print stored before this server kept the odometer.
+             */
+            filament_used_mm?: number;
             /** @description The print's identity, a version 7 UUID this server gives each print. A print that reuses a job number the machine issued before is a print of its own with an id of its own. */
             id: string;
             /**
@@ -4618,6 +4623,8 @@ export interface components {
              * @description How far the print had got when this row was last written, in whole percent. A print that finished reads 100 and one that was interrupted keeps the figure it was interrupted at.
              */
             progress: number;
+            /** @description What the slicer said about the whole print, read from the file when this server sent it to the machine. It is absent for a file the machine got another way, because a machine tells this server nothing about what is inside its files. */
+            slicer?: components["schemas"]["JobSlicer"];
             /**
              * Format: date-time
              * @description When this server first saw the print.
@@ -5426,6 +5433,25 @@ export interface components {
              * @description The page size the server applied, which is the cap when a larger one was asked for.
              */
             limit: number;
+        };
+        JobSlicer: {
+            /**
+             * Format: int64
+             * @description How long the slicer said the print takes in its normal mode, in seconds. Absent when the slicer did not say.
+             */
+            estimated_seconds?: number;
+            /**
+             * Format: double
+             * @description The filament the whole print uses, in grams. Absent when the slicer did not say.
+             */
+            filament_g?: number;
+            /**
+             * Format: double
+             * @description The filament the whole print uses, in millimetres. Absent when the slicer did not say.
+             */
+            filament_mm?: number;
+            /** @description The filament type the file was sliced for, such as PLA. Absent when the slicer did not say. */
+            material?: string;
         };
         Journal: {
             /** @description The snapshot associated with this transaction. */

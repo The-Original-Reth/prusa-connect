@@ -69,7 +69,7 @@ func TestUpgradeCheckRehearsesTheHostOnASnapshot(t *testing.T) {
 		Scan(&applied); err != nil {
 		t.Fatal(err)
 	}
-	if applied != 11 {
+	if applied != 13 {
 		t.Fatalf("live database has %d migrations", applied)
 	}
 }

@@ -72,6 +72,19 @@ type DeviceJob struct {
 
 	ObjectCount *int        `json:"object_count,omitempty" doc:"How many objects of the print the machine reported that can be cancelled one by one, as of the last reading this row holds. It is absent when the machine said nothing about them, and 0 for a print that has none. A finished print keeps the count it ended with."`
 	Objects     []JobObject `json:"objects,omitempty"      doc:"The objects of the print that can be cancelled one by one, ordered by id, as of the last reading this row holds. A finished print keeps the objects it ended with, which says which of them were cancelled. It holds at most 256. When the machine reported more, every cancelled object is kept before the others, so an object missing from the list was not cancelled unless more than 256 were." maxItems:"256"`
+
+	//nolint:lll // the huma tag is one field's whole contract and does not wrap.
+	FilamentUsedMM *float64 `json:"filament_used_mm,omitempty" doc:"The filament the print used, in millimetres, measured by the machine's extruder odometer: the reading when the print began taken off the last reading while it ran. It counts so far while the print runs. It is absent when the machine reports no odometer, for a print this server first saw after it began, and for a print stored before this server kept the odometer."`
+	//nolint:lll // the huma tag is one field's whole contract and does not wrap.
+	Slicer *JobSlicer `json:"slicer,omitempty" doc:"What the slicer said about the whole print, read from the file when this server sent it to the machine. It is absent for a file the machine got another way, because a machine tells this server nothing about what is inside its files."`
+}
+
+// JobSlicer is what the slicer wrote into a print file about the whole print.
+type JobSlicer struct {
+	FilamentMM       float64 `json:"filament_mm,omitempty"       doc:"The filament the whole print uses, in millimetres. Absent when the slicer did not say."`
+	FilamentG        float64 `json:"filament_g,omitempty"        doc:"The filament the whole print uses, in grams. Absent when the slicer did not say."`
+	EstimatedSeconds int64   `json:"estimated_seconds,omitempty" doc:"How long the slicer said the print takes in its normal mode, in seconds. Absent when the slicer did not say."`
+	Material         string  `json:"material,omitempty"          doc:"The filament type the file was sliced for, such as PLA. Absent when the slicer did not say."`
 }
 
 // DeviceJobs is what one device is printing and what it printed before that.
