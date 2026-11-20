@@ -483,7 +483,7 @@ func (d *devices) writeJobs(ctx context.Context, changed []changedRecord) {
 		}
 
 		if row, held := jobRowOf(taken.record, taken.job, taken.printID); held {
-			rows = append(rows, row)
+			rows = append(rows, withOdometer(row, taken.record.State, taken.job))
 			facts[row.DeviceID] = taken.job
 		}
 	}
@@ -530,7 +530,7 @@ func (d *devices) Jobs(ctx context.Context, principal string, id string) (httpap
 	var out httpapi.DeviceJobs
 
 	for _, job := range stored {
-		rendered := jobRender(job)
+		rendered := d.renderJob(ctx, job)
 
 		if job.Running() {
 			if out.Current == nil {
@@ -572,7 +572,7 @@ func (d *devices) Job(ctx context.Context, principal string, jobID string) (http
 		return httpapi.DeviceJob{}, err
 	}
 
-	return jobRender(stored), nil
+	return d.renderJob(ctx, stored), nil
 }
 
 // jobNotFound is the one refusal of a read by print id.
@@ -606,6 +606,10 @@ func jobRender(job devicestore.PrinterJob) httpapi.DeviceJob {
 	}
 
 	out.ObjectCount, out.Objects = renderJobObjects(job.Objects)
+
+	if used, measured := job.FilamentUsed(); measured {
+		out.FilamentUsedMM = &used
+	}
 
 	return out
 }
@@ -716,7 +720,7 @@ func (d *devices) JobHistory(
 			break
 		}
 
-		page.Items = append(page.Items, jobRender(job))
+		page.Items = append(page.Items, d.renderJob(ctx, job))
 	}
 
 	return page, nil
@@ -763,7 +767,7 @@ func (d *devices) ListJobs(
 			break
 		}
 
-		page.Items = append(page.Items, jobRender(job))
+		page.Items = append(page.Items, d.renderJob(ctx, job))
 	}
 
 	return page, nil

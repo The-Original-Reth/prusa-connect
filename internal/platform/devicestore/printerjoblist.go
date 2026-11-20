@@ -34,7 +34,8 @@ const (
 // read through an EXISTS so each row costs one lookup.
 const (
 	fleetJobsSelect = `SELECT j.printer_job_id, j.device_id, j.device_job_id, j.path, j.display_name, j.state,
-		j.progress, j.time_remaining, j.started, j.ended, j.objects, j.outcome
+		j.progress, j.time_remaining, j.started, j.ended, j.objects, j.outcome,
+		j.odometer_start, j.odometer_end, j.odometer_id
 	FROM printer_job j
 	WHERE `
 

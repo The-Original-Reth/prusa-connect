@@ -37,7 +37,8 @@ const (
 	// finished before the shutdown to the moment the process started.
 	upsertPrinterJobPrefix = `INSERT INTO printer_job
 		(printer_job_id, device_id, device_job_id, path, display_name, state,
-		 progress, time_remaining, started, ended, objects, outcome)
+		 progress, time_remaining, started, ended, objects, outcome,
+		 odometer_start, odometer_end, odometer_id)
 		VALUES `
 
 	// A print that has ended is finished, and every column of it is frozen at
@@ -53,6 +54,14 @@ const (
 	// terminal words belongs to the machine's dialect and this table must not
 	// hold a copy of it. A row with an end is done. A row without one takes
 	// every reading it is given.
+	//
+	// The odometer columns follow the same guard and two rules of their own.
+	// The start is taken once, from the first write that carries one, with the
+	// odometer's id beside it. A write carries a start only for a print that
+	// has just begun (internal/app's odometerStartOf), so a print first seen
+	// part way has none. The end is the newest reading under the start's id
+	// that is not below the start: a machine that resets its odometers reports
+	// readings under a new id, and those are not this print's.
 	upsertPrinterJobSuffix = `
 		ON CONFLICT (printer_job_id) DO UPDATE SET
 			path = CASE WHEN printer_job.ended IS NULL THEN excluded.path
@@ -69,6 +78,17 @@ const (
 				ELSE printer_job.objects END,
 			outcome = CASE WHEN printer_job.ended IS NULL THEN excluded.outcome
 				ELSE printer_job.outcome END,
+			odometer_start = CASE WHEN printer_job.ended IS NULL AND printer_job.odometer_start IS NULL
+				THEN excluded.odometer_start ELSE printer_job.odometer_start END,
+			odometer_id = CASE WHEN printer_job.ended IS NULL AND printer_job.odometer_start IS NULL
+				THEN excluded.odometer_id ELSE printer_job.odometer_id END,
+			odometer_end = CASE
+				WHEN printer_job.ended IS NOT NULL THEN printer_job.odometer_end
+				WHEN excluded.odometer_end IS NULL THEN printer_job.odometer_end
+				WHEN printer_job.odometer_start IS NULL THEN excluded.odometer_end
+				WHEN excluded.odometer_id = printer_job.odometer_id
+					AND excluded.odometer_end >= printer_job.odometer_start THEN excluded.odometer_end
+				ELSE printer_job.odometer_end END,
 			ended = COALESCE(printer_job.ended, excluded.ended)`
 
 	// Newest first, which is the order both readers want: the current job is
@@ -107,16 +127,17 @@ const (
 	// printerJobColumns is the column list every read selects, in the order
 	// scanPrinterJob reads it.
 	printerJobColumns = `printer_job_id, device_id, device_job_id, path, display_name, state,
-			progress, time_remaining, started, ended, objects, outcome`
+			progress, time_remaining, started, ended, objects, outcome,
+			odometer_start, odometer_end, odometer_id`
 )
 
 const (
 	// jobColumns is how many parameters one job costs.
-	jobColumns = 12
+	jobColumns = 15
 
-	// jobBatchRows is how many jobs one statement carries. 83 rows of 12
-	// columns is 996 parameters, inside the 999 SQLite shipped before 3.32.
-	jobBatchRows = 83
+	// jobBatchRows is how many jobs one statement carries. 66 rows of 15
+	// columns is 990 parameters, inside the 999 SQLite shipped before 3.32.
+	jobBatchRows = 66
 )
 
 // ErrPrinterJobUnknownDevice reports a job written for a device the directory
@@ -177,6 +198,26 @@ type PrinterJob struct {
 	// was written without one holds none. This store holds the word and knows
 	// no set of them.
 	Outcome string
+
+	// OdometerStart is the extruder's odometer, in millimetres, when the print
+	// began, and OdometerID is the odometer's id then. OdometerEnd is the
+	// newest reading under that id while the print ran. Each is nil when the
+	// machine reported none. OdometerStart is nil for a print first seen after
+	// it began, because a reading then would count less than the print used.
+	OdometerStart *float64
+	OdometerEnd   *float64
+	OdometerID    *int64
+}
+
+// FilamentUsed is the filament the print used as the machine's odometer
+// measured it, in millimetres. It reports false when that cannot be measured:
+// no odometer reading at the start, or none since.
+func (j PrinterJob) FilamentUsed() (float64, bool) {
+	if j.OdometerStart == nil || j.OdometerEnd == nil || *j.OdometerEnd < *j.OdometerStart {
+		return 0, false
+	}
+
+	return *j.OdometerEnd - *j.OdometerStart, true
 }
 
 // Running reports whether this print has not ended.
@@ -252,7 +293,7 @@ func jobArgs(batch []PrinterJob) []any {
 		out = append(out,
 			job.JobID, job.DeviceID, job.DeviceJobID, job.Path, job.DisplayName, job.State,
 			job.Progress, job.TimeRemaining, job.Started.UTC(), endedValue(job.Ended), job.Objects,
-			outcomeValue(job))
+			outcomeValue(job), nullable(job.OdometerStart), nullable(job.OdometerEnd), nullable(job.OdometerID))
 	}
 
 	return out
@@ -267,6 +308,15 @@ func outcomeValue(job PrinterJob) string {
 	}
 
 	return job.Outcome
+}
+
+// nullable is a pointer as a column takes it: NULL for nil.
+func nullable[T any](value *T) any {
+	if value == nil {
+		return nil
+	}
+
+	return *value
 }
 
 // endedValue is the end of a print as the column takes it. A running print
@@ -389,13 +439,16 @@ func (s *Store) EndPrinterJob(ctx context.Context, jobID string, ended time.Time
 // scanPrinterJob reads one row of the job query.
 func scanPrinterJob(rows interface{ Scan(...any) error }) (PrinterJob, error) {
 	var (
-		job   PrinterJob
-		ended sql.NullTime
+		job                        PrinterJob
+		ended                      sql.NullTime
+		odometerStart, odometerEnd sql.NullFloat64
+		odometerID                 sql.NullInt64
 	)
 
 	err := rows.Scan(
 		&job.JobID, &job.DeviceID, &job.DeviceJobID, &job.Path, &job.DisplayName, &job.State,
 		&job.Progress, &job.TimeRemaining, &job.Started, &ended, &job.Objects, &job.Outcome,
+		&odometerStart, &odometerEnd, &odometerID,
 	)
 	if err != nil {
 		return PrinterJob{}, failure("scan a printer job", err)
@@ -405,6 +458,18 @@ func scanPrinterJob(rows interface{ Scan(...any) error }) (PrinterJob, error) {
 
 	if ended.Valid {
 		job.Ended = ended.Time.UTC()
+	}
+
+	if odometerStart.Valid {
+		job.OdometerStart = &odometerStart.Float64
+	}
+
+	if odometerEnd.Valid {
+		job.OdometerEnd = &odometerEnd.Float64
+	}
+
+	if odometerID.Valid {
+		job.OdometerID = &odometerID.Int64
 	}
 
 	return job, nil
